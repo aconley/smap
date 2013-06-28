@@ -19,7 +19,7 @@ def get_spire_beam(band, pixscale=None, nfwhm=5.0, oversamp=5):
     
     pixscale: float
       Pixel scale, in same units as FWHM.  If not provided, defaults
-      based on band
+      based on band to the values in smap.smap_pixsize[band]
 
     nfwhm: float
       Number of fwhm (approximately) of each dimension of the output beam.

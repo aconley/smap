@@ -14,7 +14,14 @@ __all__ = ["smap_map"]
 class smap_map:
     """ Represents SMAP map"""
     def __init__(self, filename=None):
-        """ Basic constructor"""
+        """ Basic constructor
+
+        Parameters
+        ----------
+        filename: string or None
+          If present, the file specificed by this filename is read in
+        """
+
         self._has_data = False
         self._has_exposure = False
         self._has_error = False
@@ -23,7 +30,13 @@ class smap_map:
             self.read(filename)
 
     def read(self, filename):
-        """ Read from a FITS structure"""
+        """ Read from a FITS file.
+
+        Parameters
+        ----------
+        filename: string
+          FITS file to read in data from."""
+
         hdulist = fits.open(filename, uint=True)
 
         # Figure out what we have
@@ -46,6 +59,7 @@ class smap_map:
         self.xsize = self.image.shape[0]
         self.ysize = self.image.shape[1]
         self._has_filter = False # Not supported yet
+        # This is a non-FITS compliant keyword, so avoid it for now
         # self.todmask = hdulist[image_ext].header['TOD_EXCLUDEMASK']
 
         # Set name
@@ -99,7 +113,13 @@ class smap_map:
         self._has_data = True
 
     def write(self, filename):
-        """ Write as FITS file"""
+        """ Write as FITS file.
+
+        Parameters
+        ----------
+        filename: string
+          File to write data to in FITS format.
+        """
         
         if not self._has_data:
             raise IOError("Attempting to write empty smap map")
@@ -125,7 +145,7 @@ class smap_map:
             hdulist.append(fits.ImageHDU(data=self.mask, uint=True,
                                          header=head, name='mask'))
 
-        hdulist.writeto(filename)
+        hdulist.writeto(filename, clobber=True, checksum=True)
         
     def create(self, image, pixscale, racen, deccen,  wave=None,
                bands=None, error=None, exposure=None, mask=None):
@@ -262,7 +282,7 @@ class smap_map:
         return self._has_mask
 
     def add_noise(self, sigma):
-        """ Add Gaussian noise.
+        """ Add Gaussian noise to map.
 
         Will update the error extension if present"""
 
@@ -279,11 +299,93 @@ class smap_map:
 
         self.map += np.random.normal(scale=sigval, size=self.map.shape)
 
+    def where_bad(self):
+        """ Returns a list of pixels that are bad (no exposure, masked,
+        non-finite"""
+        badpix = np.zeros(self.image.shape, dtype=np.bool)
+        np.place(badpix, ~np.isfinite(self.image), True)
+        if self._has_exposure:
+            np.place(badpix, self.exposure <= 0.0, True)
+        if self._has_mask:
+            np.place(badpix, self.mask != 0, True)
+        return np.nonzero(badpix)
+        
+    def estimate_noise(self):
+        """ Attempts to estimate a representative noise level for the map
+
+        The approach is to take the central 20% of the image (in each
+        dimension), mask out all pixels with mask bits, zero
+        exposure, or non-finite values, and return the median noise
+        estimate.
+        """
+        
+        if not self._has_data:
+            raise Exception("Trying to estimate noise on empty map")
+        if not self._has_error:
+            raise Exception("Can't estimate noise in map with no error info")
+
+        xcen = self.xsize // 2
+        ycen = self.ysize // 2
+        dx = math.ceil(self.xsize * 0.1)
+        dy = math.ceil(self.ysize * 0.1)
+        cen_im = self.image[xcen-dx:xcen+dx, ycen-dy:ycen+dy]
+        badpix = np.zeros(cen_im.shape, dtype=np.bool)
+        np.place(badpix, ~np.isfinite(cen_im), True)
+        if self._has_exposure:
+            np.place(badpix, 
+                     self.exposure[xcen-dx:xcen+dx, ycen-dy:ycen+dy] <= 0.0, 
+                     True)
+        if self._has_mask:
+            np.place(badpix, 
+                     self.mask[xcen-dx:xcen+dx, ycen-dy:ycen+dy] != 0,
+                     True)
+        nbad = np.count_nonzero(badpix)
+        npix = cen_im.shape[0] * cen_im.shape[1]
+        errmap = self.error[xcen-dx:xcen+dx, ycen-dy:ycen+dy]
+        if nbad != 0:
+            # There are some pixels to skip
+            if nbad == npix:
+                raise Exception("All pixels in central region masked")
+            mederr = np.median(errmap[np.nonzero(~badpix)])
+        else:
+            mederr = np.median(errmap)
+        return mederr
+
+    def convolve(self, kernel):
+        """ Convovles the map, dealing with bad pixels
+
+        Parameters
+        ----------
+        kernel: ndarray
+          Input smoothing filter in real space.  Should be much smaller 
+          than the input map, or this will be quite slow.
+
+        Notes
+        -----
+          Currently does not alter the error information, just the
+          actual map.  Uses brute-force (non-FFT) convolution, since
+          this is usually faster for small kernels.
+        """
+    
+        from astropy.nddata import convolve
+
+        badpix = self.where_bad()
+        nbad = len(badpix[0])
+
+        # v0.2 of astropy.nddata.convolve modifies kernel, so make
+        # a copy
+        if nbad == 0:
+            # Hey, no bad pixels.  probably a simulation, but easy
+            self.image = convolve(self.image, kernel.copy(), boundary='wrap')
+        else:
+            self.image[badpix] = np.nan
+            self.image = convolve(self.image, kernel.copy(), boundary='wrap')
+
     def __str__(self):
         """ String representation"""
         if not self._has_data:
             return "Empty SMAP map"
-        outstr = "SMAP map"
+        outstr = "SMAP map\n"
         if hasattr(self, 'wave'):
             outstr += " wavelength: %d [um]" % self.wave
         if hasattr(self, 'names'):
