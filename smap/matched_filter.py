@@ -84,7 +84,7 @@ def make_matched_filter(band, nx, ny, inst_noise, conf_noise=None,
       The real space matched filter.  Note that
       they are not applied to the data by this function.
     """
-
+    
     if not band in spire_fwhm:
         raise ValueError("Unknown band: %s" % band)
     nx = int(nx)
