@@ -398,16 +398,16 @@ class smap_map:
 
         Returns
         -------
-        radec: ndarray
-          A npos by 2 array of ra/dec values in decimal degrees at
-          whatever epoch the map coordinates are specified in.
+        [ra, dec]: list of ndarray
+          A list containing 2 ndarrays, the first of which is ra
+        and the second dec, both in decimal degrees.
 
         Notes
         -----
-         xpos and ypos must be broadcastable to each other.
-         Also remember that the data follows pyfits conventions,
-         so the map values corresponding to xpos, ypos are
-         map.image[ypos, xpos].
+          xpos and ypos must be broadcastable to each other.
+        Also remember that the data follows pyfits conventions,
+        so the map values corresponding to xpos, ypos are
+        map.image[ypos, xpos].
         """
 
         if not self._has_data:
@@ -428,15 +428,16 @@ class smap_map:
 
         Returns
         -------
-        xypos
-          A npos by 2 array of x, y positions, zero indexed.
+        [x, y]: list of ndarray
+          A list containing the x and y positions (zero offset)
+        as ndarrays.
 
         Notes
         -----
          ra, dec must be broadcastable to each other.
          Also remember that the data follows pyfits conventions,
          so the map values corresponding to xypos are
-         map.image[xypos[:, 1], xypos[:, 0]].
+         map.image[xypos[1], xypos[0]].
         """
 
         if not self._has_data:
