@@ -9,7 +9,7 @@ from astropy.nddata import convolve
 
 __all__ = ["cattomap_gauss"]
 
-def cattomap_gauss(area, fluxes, wave=[250.0,350,500], 
+def cattomap_gauss(area, fluxes, wave=[250.0, 350, 500], 
 		   pixsize=[6.0, 8.33333, 12.0], racen=25.0, deccen=0.0, 
 		   fwhm=[17.6, 23.9, 35.2], nfwhm=5.0, bmoversamp=5, 
 		   sigma_inst=None, verbose=False):
@@ -55,7 +55,8 @@ def cattomap_gauss(area, fluxes, wave=[250.0,350,500],
     Returns
     -------
       A tuple containing an array input maps and the x/y positions
-      of the sources (in the first map)
+      of the sources (in the first map).  Note that the maps are
+      indexed in [y, x] order.
     """
 
     import math	
@@ -119,7 +120,7 @@ def cattomap_gauss(area, fluxes, wave=[250.0,350,500],
                          pixsize[i], racen, deccen, wave=wave[i],
                          error=int_sigma[i]*np.ones((nextent[i], nextent[i]), 
                                                     dtype=np.float32))
-        if has_sigma:
+        else:
             s_map.create(np.zeros((nextent[i], nextent[i]), dtype=np.float32),
                          pixsize[i], racen, deccen, wave=wave[i])
         maps.append(s_map)
@@ -131,7 +132,7 @@ def cattomap_gauss(area, fluxes, wave=[250.0,350,500],
     # Construct maps
     for i in range(nbands):
         if verbose:
-            print("Preparing %0.1f map" % wave[i])
+            print("Preparing %0.1f um map" % wave[i])
 
         # Add sources
         if verbose:
@@ -144,22 +145,21 @@ def cattomap_gauss(area, fluxes, wave=[250.0,350,500],
         np.place(xf, xf > nx-1, nx-1)
         np.place(yf, yf > ny-1, ny-1)
         for cx, cy, cf in zip(xf, yf, fluxes[:,i]):
-            cmap[cx, cy] += cf
+            cmap[cy, cx] += cf # Note y, x
 
         # Smooth
         if verbose:
             print(" Smoothing")
         bm = get_gauss_beam(fwhm[i], pixsize[i], nfwhm)
-        convmap = convolve(cmap, bm, boundary='wrap')
+        maps[i].image = convolve(cmap, bm, boundary='wrap')
 
         # Noise
         if verbose:
             print(" Adding noise")
         if has_sigma:
-            convmap +=np.random.normal(scale=int_sigma[i], 
-                                       size=convmap.shape)
+            maps[i].image +=np.random.normal(scale=int_sigma[i], 
+                                             size=convmap.shape)
             
-        convmap -= convmap.mean()
-        maps[i].image = convmap
+        maps[i].image -= maps[i].image.mean()
         
     return (maps, xpos, ypos)

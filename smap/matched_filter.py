@@ -17,14 +17,16 @@ __all__ = ["make_matched_filter", "make_red_matched_filter",
            "matched_filter", "matched_filter_red"]
 
 def make_beam(band, pixscale, nx, ny):
-    """ Internal helper function to make full size, 0,0 centered beam."""
+    """ Internal helper function to make full size, 0,0 centered beam.
+    Note that the beam is [y, x] indexed, since smap maps are also done
+    that way"""
 
     fwhm_pix = spire_fwhm[band] / pixscale
     sigma_pix = fwhm_pix / math.sqrt(8 * math.log(2))
-    beam = make_kernel((nx, ny), kernelwidth=sigma_pix)
+    beam = make_kernel((ny, nx), kernelwidth=sigma_pix)
     beam /= beam.max()
     # The max is as nx // 2, ny // 2 -- we want it at 0, 0
-    return np.roll(np.roll(beam, -(nx // 2), axis=0), -(ny // 2), axis=1)
+    return np.roll(np.roll(beam, -(ny // 2), axis=0), -(nx // 2), axis=1)
 
 def filt_norm_fac(filt, band, pixscale):
     """ Return the normalization factor for the filter"""
@@ -116,10 +118,10 @@ def make_matched_filter(band, nx, ny, inst_noise, conf_noise=None,
 
     # First white noise
     if inst_noise > 0:
-        p_noise = np.empty((nx, ny), dtype=np.float32)
+        p_noise = np.empty((ny, nx), dtype=np.float32)
         p_noise[:, :] = nx * ny * inst_noise**2
     else:
-        p_noise = np.zeros((nx, ny), dtype=np.float32)
+        p_noise = np.zeros((ny, nx), dtype=np.float32)
 
 
     # We build this ourselves to get the right size and
@@ -206,10 +208,10 @@ def make_red_matched_filter(nx, ny, pixscale, inst_noise, conf_noise,
 
     # First white noise
     if inst_noise > 0:
-        p_noise = np.empty((nx, ny), dtype=np.float32)
+        p_noise = np.empty((ny, nx), dtype=np.float32)
         p_noise[:, :] = nx * ny * inst_noise**2
     else:
-        p_noise = np.zeros((nx, ny), dtype=np.float32)
+        p_noise = np.zeros((ny, nx), dtype=np.float32)
 
     # Now, work out the matched filter for the 500um beam
     # We build this ourselves to get the right size and

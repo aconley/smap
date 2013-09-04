@@ -12,7 +12,13 @@ import numpy as np
 __all__ = ["smap_map"]
 
 class smap_map:
-    """ Represents SMAP map"""
+    """ Represents SMAP map
+
+    Notes
+    -----
+     Following pyfits conventions, the indexing scheme for the image,
+    error map, etc., is [y, x] rather than [x, y]
+    """
     def __init__(self, filename=None):
         """ Basic constructor
 
@@ -29,13 +35,24 @@ class smap_map:
         if not filename is None:
             self.read(filename)
 
-    def read(self, filename):
+    def read(self, filename, read_error=True, read_exposure=True,
+             read_mask=True):
         """ Read from a FITS file.
 
         Parameters
         ----------
         filename: string
-          FITS file to read in data from."""
+          FITS file to read in data from.
+
+        read_error: boolean
+          Read in error information (if present)
+
+        read_exposure: boolean
+          Read in exposure information (if present)
+
+        read_mask: boolean
+          Read in mask information (if present)
+        """
 
         hdulist = fits.open(filename, uint=True)
 
@@ -56,8 +73,8 @@ class smap_map:
             self.bands = hdulist[image_ext].header['DESC']
         elif hasattr(self, 'bands'):
             del self.bands
-        self.xsize = self.image.shape[0]
-        self.ysize = self.image.shape[1]
+        self.xsize = self.image.shape[1] # Note the transpose!
+        self.ysize = self.image.shape[0]
         self._has_filter = False # Not supported yet
         # This is a non-FITS compliant keyword, so avoid it for now
         # self.todmask = hdulist[image_ext].header['TOD_EXCLUDEMASK']
@@ -82,29 +99,44 @@ class smap_map:
 						  unit=(u.degree, u.degree)))
         self.pixscale = math.sqrt(s1.arcsecs * s2.arcsecs)
         
-        try:
-            error_ext = hdulist.index_of('error')
-            self._has_error = True
-            self.error = hdulist[error_ext].data
-        except KeyError:
+        if read_error:
+            try:
+                error_ext = hdulist.index_of('error')
+                self._has_error = True
+                self.error = hdulist[error_ext].data
+            except KeyError:
+                self._has_error = False
+                if hasattr(self, 'error'):
+                    del self.error
+        else:
             self._has_error = False
             if hasattr(self, 'error'):
                 del self.error
 
-        try:
-            exposure_ext = hdulist.index_of('exposure')
-            self._has_exposure = True
-            self.exposure = hdulist[exposure_ext].data
-        except KeyError:
+        if read_exposure:
+            try:
+                exposure_ext = hdulist.index_of('exposure')
+                self._has_exposure = True
+                self.exposure = hdulist[exposure_ext].data
+            except KeyError:
+                self._has_exposure = False
+                if hasattr(self, 'exposure'):
+                    del self.exposure
+        else:
             self._has_exposure = False
             if hasattr(self, 'exposure'):
                 del self.exposure
 
-        try:
-            mask_ext = hdulist.index_of('mask')
-            self._has_mask = True
-            self.mask = hdulist[mask_ext].data
-        except KeyError:
+        if read_mask:
+            try:
+                mask_ext = hdulist.index_of('mask')
+                self._has_mask = True
+                self.mask = hdulist[mask_ext].data
+            except KeyError:
+                self._has_mask = False
+                if hasattr(self, 'mask'):
+                    del self.mask
+        else:
             self._has_mask = False
             if hasattr(self, 'mask'):
                 del self.mask
@@ -154,7 +186,9 @@ class smap_map:
         Parameters
         ----------
         image: ndarray
-          Map.  2D array
+          Map.  2D array.  Note that, as is the case for error,
+          exposure, etc., this must use the indexing convention
+          [y, x] following astropy.io.fits conventions.
         
         wave: float
           Wavelength in microns of map
@@ -189,8 +223,8 @@ class smap_map:
 
         self._has_data = True
         self.image = image.astype(np.float32)
-        self.xsize = image.shape[0]
-        self.ysize = image.shape[1]
+        self.xsize = image.shape[1] # note transpose
+        self.ysize = image.shape[0]
 
         self.pixscale = float(pixscale)
         self.astrometry = wcs.WCS(naxis=2)
@@ -328,20 +362,20 @@ class smap_map:
         ycen = self.ysize // 2
         dx = math.ceil(self.xsize * 0.1)
         dy = math.ceil(self.ysize * 0.1)
-        cen_im = self.image[xcen-dx:xcen+dx, ycen-dy:ycen+dy]
+        cen_im = self.image[ycen-dy:ycen+dy, xcen-dx:xcen+dx] # Note transpose!
         badpix = np.zeros(cen_im.shape, dtype=np.bool)
         np.place(badpix, ~np.isfinite(cen_im), True)
         if self._has_exposure:
             np.place(badpix, 
-                     self.exposure[xcen-dx:xcen+dx, ycen-dy:ycen+dy] <= 0.0, 
+                     self.exposure[ycen-dy:ycen+dy, xcen-dx:xcen+dx] <= 0.0, 
                      True)
         if self._has_mask:
             np.place(badpix, 
-                     self.mask[xcen-dx:xcen+dx, ycen-dy:ycen+dy] != 0,
+                     self.mask[ycen-dy:ycen+dy, xcen-dx:xcen+dx] != 0,
                      True)
         nbad = np.count_nonzero(badpix)
         npix = cen_im.shape[0] * cen_im.shape[1]
-        errmap = self.error[xcen-dx:xcen+dx, ycen-dy:ycen+dy]
+        errmap = self.error[ycen-dy:ycen+dy, xcen-dx:xcen+dx]
         if nbad != 0:
             # There are some pixels to skip
             if nbad == npix:
@@ -351,6 +385,65 @@ class smap_map:
             mederr = np.median(errmap)
         return mederr
 
+    def pix2world(self, xpos, ypos):
+        """ Convert image positions to world coordinates (ra, dec)
+
+        Parameters
+        ----------
+        xpos: ndarray
+          X positions to convert, zero indexed.
+
+        ypos: ndarray
+          Y positions to convert, zero indexed.
+
+        Returns
+        -------
+        radec: ndarray
+          A npos by 2 array of ra/dec values in decimal degrees at
+          whatever epoch the map coordinates are specified in.
+
+        Notes
+        -----
+         xpos and ypos must be broadcastable to each other.
+         Also remember that the data follows pyfits conventions,
+         so the map values corresponding to xpos, ypos are
+         map.image[ypos, xpos].
+        """
+
+        if not self._has_data:
+            raise Exception("No data present")
+
+        return self.astrometry.all_pix2world(xpos, ypos, 0)
+
+    def world2pix(self, ra, dec):
+        """ Convert image positions to world coordinates (ra, dec)
+
+        Parameters
+        ----------
+        ra: ndarray
+          RA positions to convert, in the epoch of the map.
+
+        dec: ndarray
+          DEC positions to convert, in the epoch of the map.
+
+        Returns
+        -------
+        xypos
+          A npos by 2 array of x, y positions, zero indexed.
+
+        Notes
+        -----
+         ra, dec must be broadcastable to each other.
+         Also remember that the data follows pyfits conventions,
+         so the map values corresponding to xypos are
+         map.image[xypos[:, 1], xypos[:, 0]].
+        """
+
+        if not self._has_data:
+            raise Exception("No data present")
+
+        return self.astrometry.all_world2pix(ra, dec, 0)
+
     def convolve(self, kernel):
         """ Convovles the map, dealing with bad pixels
 
@@ -358,7 +451,8 @@ class smap_map:
         ----------
         kernel: ndarray
           Input smoothing filter in real space.  Should be much smaller 
-          than the input map, or this will be quite slow.
+          than the input map, or this will be quite slow.  Note that
+          you want this to be transposed to follow the fits convention.
 
         Notes
         -----

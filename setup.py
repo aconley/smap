@@ -8,7 +8,7 @@ if (major < 3) and (minor1 < 7):
 
 setup(
     name="smap",
-    version="0.1.0",
+    version="0.1.1",
     author="Alexander Conley",
     author_email="alexander.conley@colorado.edu",
     packages=["smap"],
