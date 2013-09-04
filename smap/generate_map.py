@@ -158,7 +158,7 @@ def cattomap_gauss(area, fluxes, wave=[250.0, 350, 500],
             print(" Adding noise")
         if has_sigma:
             maps[i].image +=np.random.normal(scale=int_sigma[i], 
-                                             size=convmap.shape)
+                                             size=maps[i].image.shape)
             
         maps[i].image -= maps[i].image.mean()
         
