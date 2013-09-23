@@ -88,30 +88,30 @@ def make_matched_filter(band, nx, ny, inst_noise, conf_noise=None,
     """
     
     if not band in spire_fwhm:
-        raise ValueError("Unknown band: %s" % band)
+        raise ValueError("Unknown band: {:s}".format(band))
     nx = int(nx)
     if nx <= 0:
-        raise ValueError("Invalid (non-positive) nx")
+        raise ValueError("Invalid (non-positive) nx: {:d}".format(nx))
     ny = int(ny)
     if ny <= 0:
-        raise ValueError("Invalid (non-positive) ny")
+        raise ValueError("Invalid (non-positive) ny: {:d}".format(ny))
     inst_noise = float(inst_noise)
     if inst_noise < 0:
-        raise ValueError("Invalid (negative) instrument noise")
+        raise ValueError("Invalid (negative) instrument noise {:f}".format(inst_noise))
     if conf_noise is None:
         conf_noise = spire_confusion[band]
     else:
         conf_noise = float(conf_noise)
         if conf_noise < 0:
-            raise ValueError("Invalid (negative) confusion "
-                             "noise: %f" % conf_noise)
+            msg = "Invalid (negative) confusion noise: {:f}"
+            raise ValueError(msg.format(conf_noise))
     if pixscale is None:
         pixscale = smap_pixsize[band]
     else:
         pixscale = float(pixscale)
         if pixscale <= 0.0:
-            raise ValueError("Invalid (non-positive) pixel "
-                             "scale: %f" % pixscale)
+            errmsg = "Invalid (non-positive) pixel scale: {:f}" 
+            raise ValueError(errmsg.format(pixscale))
 
     if inst_noise == 0 and conf_noise == 0:
         raise ValueError("One of inst_noise or conf_noise must be non-zero")
@@ -309,7 +309,7 @@ def matched_filter(inmap, conf_noise=None, verbose=False):
     if not hasattr(inmap, 'names'):
         raise Exception("Don't know band of SPIRE map")
     if not inmap.names in spire_fwhm:
-        raise Exception("Unknown band from input map: %s" % inmap.names)
+        raise Exception("Unknown band from input map: {:s}".format(inmap.names))
 
     if conf_noise is None:
         conf_noise = spire_confusion[inmap.names]
@@ -319,7 +319,7 @@ def matched_filter(inmap, conf_noise=None, verbose=False):
     # Get the noise estimate
     inst_sigma = inmap.estimate_noise()
     if verbose:
-        print("Estimated map noise: %0.5f" % inst_sigma)
+        print("Estimated map noise: {:0.5f}".format(inst_sigma))
 
     # Get filter
     filts = make_matched_filter(nx, ny, inst_sigma, conf_noise=conf_noise,
@@ -397,7 +397,8 @@ def matched_filter_red(map250, map350, map500, conf_noise, k1=-0.3919, k2=0.0,
 
     conf_noise = float(conf_noise)
     if conf_noise < 0.0:
-        raise ValueError("Invalid (negative) confusion noise: %f" % conf_noise)
+        errmsg = "Invalid (negative) confusion noise: {:f}"
+        raise ValueError(errmsg.format(conf_noise))
     
     # Make sure the maps have data
     if not map250.has_data:
@@ -440,7 +441,7 @@ def matched_filter_red(map250, map350, map500, conf_noise, k1=-0.3919, k2=0.0,
         white_var += (k3 * map500.estimate_noise())**2
     inst_sigma = math.sqrt(white_var)
     if verbose:
-        print("Estimated map noise: %0.5f" % inst_sigma)
+        print("Estimated map noise: {:0.5f}".format(inst_sigma))
 
     # Get filters
     filts = make_red_matched_filter(nx, ny, pixscale, inst_sigma, conf_noise)

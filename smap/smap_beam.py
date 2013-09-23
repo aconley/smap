@@ -31,17 +31,19 @@ def get_spire_beam(band, pixscale=None, nfwhm=5.0, oversamp=5):
     """
     
     if not band in spire_fwhm:
-        raise ValueError("Unknown band for FWHM: %s" % band)
+        raise ValueError("Unknown band for FWHM: {:s}".format(band))
     fwhm = spire_fwhm[band]
 
     if pixscale is None:
         if not band in smap_pixsize:
-            raise ValueError("Unknown band for default pixel scale: %s" % band)
+            errmsg = "Unknown band for default pixel scale: {:s}"
+            raise ValueError(errmsg.format(band))
         pix = smap_pixsize[band]
     else:
         pix = float(pixscale)
         if pix <= 0:
-            raise ValueError("Invalid (non-positive) pixel scale: %f" % pix)
+            errmsg = "Invalid (non-positive) pixel scale: {:f}"
+            raise ValueError(errmsg.format(pix))
 
     return get_gauss_beam(fwhm, pix, nfwhm=nfwhm, oversamp=oversamp)
 

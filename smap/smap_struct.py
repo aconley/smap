@@ -61,7 +61,8 @@ class smap_map:
             image_ext = hdulist.index_of('image')
         except KeyError:
             hdulist.close()
-            raise IOError("File %s doesn't have primary image" % filename)
+            errmsg = "File {:s} doesn't have primary image"
+            raise IOError(errmsg.format(filename))
         
         self.image = hdulist[image_ext].data
         self.astrometry = wcs.WCS(hdulist[image_ext].header)
@@ -325,7 +326,7 @@ class smap_map:
 
         sigval = float(sigma)
         if sigval < 0:
-            raise ValueError("Invalid (negative) sigma: %f" % sigval)
+            raise ValueError("Invalid (negative) sigma: {:f}".format(sigval))
         if sigval == 0:
             return #Nothing to do
         if self._has_error:
@@ -482,18 +483,19 @@ class smap_map:
             return "Empty SMAP map"
         outstr = "SMAP map\n"
         if hasattr(self, 'wave'):
-            outstr += " wavelength: %d [um]" % self.wave
+            outstr += " wavelength: {:d} [um]".format(self.wave)
         if hasattr(self, 'names'):
-            outstr += " desc: %s" % self.names
-        outstr += "\n RA: %0.4f [deg]  DEC: %0.4f [deg]" %\
-            (self.astrometry.wcs.crval[0], self.astrometry.wcs.crval[1])
-        outstr += " Pixscale: %0.2f [arcsec]" % self.pixscale
-        outstr += "\n Map [%d x %d]" % (self.xsize, self.ysize)
+            outstr += " desc: {:s}".format(self.names)
+        tg = "\n RA: {0.:0.4f} [deg]  DEC: {1:0.4f} [deg]"
+        outstr += tg.format(self.astrometry.wcs.crval[0], 
+                            self.astrometry.wcs.crval[1])
+        outstr += " Pixscale: {:0.2f} [arcsec]".format(self.pixscale)
+        outstr += "\n Map [{:d} x {:d}]".format(self.xsize, self.ysize)
         if self._has_error:
-            outstr += "\n Error map [%d x %d]" % (self.xsize, self.ysize)
+            outstr += "\n Has error map"
         if self._has_exposure:
-            outstr += "\n Exposure map [%d x %d]" % (self.xsize, self.ysize)
+            outstr += "\n Has exposure map"
         if self._has_mask:
-            outstr += "\n Mask map [%d x %d]" % (self.xsize, self.ysize)
+            outstr += "\n Has mask map"
 
         return outstr

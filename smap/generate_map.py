@@ -132,7 +132,7 @@ def cattomap_gauss(area, fluxes, wave=[250.0, 350, 500],
     # Construct maps
     for i in range(nbands):
         if verbose:
-            print("Preparing %0.1f um map" % wave[i])
+            print("Preparing {:0.1f} um map".format(wave[i]))
 
         # Add sources
         if verbose:
