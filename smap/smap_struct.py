@@ -7,9 +7,15 @@ import astropy.coordinates as coords
 from astropy import units as u
 import numpy as np
 
-""" Reads and writes SMAP fits structures"""
+""" Reads and writes SMAP fits structures.
+
+Note that the data is read in in astropy.io.fits order --
+which means that, for example, the x, y locatoin in
+smap_map.image is [y, x].
+"""
 
 __all__ = ["smap_map"]
+
 
 class smap_map:
     """ Represents SMAP map
@@ -63,7 +69,7 @@ class smap_map:
             hdulist.close()
             errmsg = "File {:s} doesn't have primary image"
             raise IOError(errmsg.format(filename))
-        
+
         self.image = hdulist[image_ext].data
         self.astrometry = wcs.WCS(hdulist[image_ext].header)
         if 'WAVELN' in hdulist[image_ext].header:
@@ -74,9 +80,9 @@ class smap_map:
             self.bands = hdulist[image_ext].header['DESC']
         elif hasattr(self, 'bands'):
             del self.bands
-        self.xsize = self.image.shape[1] # Note the transpose!
+        self.xsize = self.image.shape[1]  # Note the transpose!
         self.ysize = self.image.shape[0]
-        self._has_filter = False # Not supported yet
+        self._has_filter = False  # Not supported yet
         # This is a non-FITS compliant keyword, so avoid it for now
         # self.todmask = hdulist[image_ext].header['TOD_EXCLUDEMASK']
 
@@ -92,14 +98,16 @@ class smap_map:
         tval = np.array([[crpix[0], crpix[1]], [crpix[0]+1, crpix[1]],
                          [crpix[0], crpix[1]+1]])
         world = self.astrometry.all_pix2world(tval, 1)
-        p0 = coords.ICRSCoordinates(ra=world[0,0], dec=world[0,1], 
-				    unit=(u.degree, u.degree))
-        s1 = p0.separation(coords.ICRSCoordinates(ra=world[1,0],dec=world[1,1], 
-						  unit=(u.degree, u.degree)))
-        s2 = p0.separation(coords.ICRSCoordinates(ra=world[2,0],dec=world[2,1], 
-						  unit=(u.degree, u.degree)))
+        p0 = coords.ICRSCoordinates(ra=world[0, 0], dec=world[0, 1],
+                                    unit=(u.degree, u.degree))
+        s1 = p0.separation(coords.ICRSCoordinates(ra=world[1, 0],
+                                                  dec=world[1, 1],
+                                                  unit=(u.degree, u.degree)))
+        s2 = p0.separation(coords.ICRSCoordinates(ra=world[2, 0],
+                                                  dec=world[2, 1],
+                                                  unit=(u.degree, u.degree)))
         self.pixscale = math.sqrt(s1.arcsecs * s2.arcsecs)
-        
+
         if read_error:
             try:
                 error_ext = hdulist.index_of('error')
@@ -141,7 +149,7 @@ class smap_map:
             self._has_mask = False
             if hasattr(self, 'mask'):
                 del self.mask
-            
+
         hdulist.close()
         self._has_data = True
 
@@ -153,7 +161,7 @@ class smap_map:
         filename: string
           File to write data to in FITS format.
         """
-        
+
         if not self._has_data:
             raise IOError("Attempting to write empty smap map")
 
@@ -166,20 +174,20 @@ class smap_map:
 
         # Set up image
         hdulist = fits.HDUList(fits.PrimaryHDU())
-        hdulist.append(fits.ImageHDU(data=self.image, 
+        hdulist.append(fits.ImageHDU(data=self.image,
                                      header=head, name='image'))
         if self._has_error:
-            hdulist.append(fits.ImageHDU(data=self.error, 
+            hdulist.append(fits.ImageHDU(data=self.error,
                                          header=head, name='error'))
         if self._has_exposure:
-            hdulist.append(fits.ImageHDU(data=self.exposure, 
+            hdulist.append(fits.ImageHDU(data=self.exposure,
                                          header=head, name='exposure'))
         if self._has_mask:
             hdulist.append(fits.ImageHDU(data=self.mask, uint=True,
                                          header=head, name='mask'))
 
         hdulist.writeto(filename, clobber=True, checksum=True)
-        
+
     def create(self, image, pixscale, racen, deccen,  wave=None,
                bands=None, error=None, exposure=None, mask=None):
         """ Create an image from input data.
@@ -190,7 +198,7 @@ class smap_map:
           Map.  2D array.  Note that, as is the case for error,
           exposure, etc., this must use the indexing convention
           [y, x] following astropy.io.fits conventions.
-        
+
         wave: float
           Wavelength in microns of map
 
@@ -215,7 +223,6 @@ class smap_map:
         mask: ndarray
           Mask array
         """
-    
 
         if not type(image) == np.ndarray:
             raise Exception("Input image not ndarray")
@@ -224,18 +231,17 @@ class smap_map:
 
         self._has_data = True
         self.image = image.astype(np.float32)
-        self.xsize = image.shape[1] # note transpose
+        self.xsize = image.shape[1]  # note transpose
         self.ysize = image.shape[0]
 
         self.pixscale = float(pixscale)
         self.astrometry = wcs.WCS(naxis=2)
         self.astrometry.wcs.crpix = [self.xsize/2, self.ysize/2]
-        self.astrometry.wcs.cd = np.array([[-self.pixscale / 3600.0, 0],
-                                           [0, self.pixscale / 3600.0]])
         self.astrometry.wcs.crval = np.array([racen, deccen],
                                              dtype=np.float64)
-        self.astrometry.wcs.ctype = ['RA---TAN'.encode(), 
-                                     'DEC--TAN'.encode()]
+        self.astrometry.wcs.cdelt = [-self.pixscale / 3600.0,
+                                     self.pixscale / 3600.0]
+        self.astrometry.wcs.ctype = ['RA---TAN', 'DEC--TAN']
 
         if not wave is None:
             self.wave = int(wave)
@@ -245,12 +251,14 @@ class smap_map:
             elif hasattr(self, 'names'):
                 del self.names
         else:
-            if hasattr(self, 'wave'): del self.wave
-            if hasattr(self, 'names'): del self.names
-            
+            if hasattr(self, 'wave'):
+                del self.wave
+            if hasattr(self, 'names'):
+                del self.names
+
         if not bands is None:
             self.bands = str(bands)
-        elif hasattr(self, 'bands'): 
+        elif hasattr(self, 'bands'):
             del self.bands
 
         if not error is None:
@@ -299,7 +307,7 @@ class smap_map:
             if hasattr(self, 'mask'):
                 del self.mask
             self._has_mask = False
-            
+
     @property
     def has_data(self):
         return self._has_data
@@ -328,7 +336,7 @@ class smap_map:
         if sigval < 0:
             raise ValueError("Invalid (negative) sigma: {:f}".format(sigval))
         if sigval == 0:
-            return #Nothing to do
+            return  # Nothing to do
         if self._has_error:
             self.error = np.sqrt(self.error**2 + sigval**2)
 
@@ -344,7 +352,7 @@ class smap_map:
         if self._has_mask:
             np.place(badpix, self.mask != 0, True)
         return np.nonzero(badpix)
-        
+
     def estimate_noise(self):
         """ Attempts to estimate a representative noise level for the map
 
@@ -353,7 +361,7 @@ class smap_map:
         exposure, or non-finite values, and return the median noise
         estimate.
         """
-        
+
         if not self._has_data:
             raise Exception("Trying to estimate noise on empty map")
         if not self._has_error:
@@ -363,15 +371,16 @@ class smap_map:
         ycen = self.ysize // 2
         dx = math.ceil(self.xsize * 0.1)
         dy = math.ceil(self.ysize * 0.1)
-        cen_im = self.image[ycen-dy:ycen+dy, xcen-dx:xcen+dx] # Note transpose!
+        # Note transpose here!
+        cen_im = self.image[ycen - dy:ycen + dy, xcen - dx:xcen + dx]
         badpix = np.zeros(cen_im.shape, dtype=np.bool)
         np.place(badpix, ~np.isfinite(cen_im), True)
         if self._has_exposure:
-            np.place(badpix, 
-                     self.exposure[ycen-dy:ycen+dy, xcen-dx:xcen+dx] <= 0.0, 
+            np.place(badpix,
+                     self.exposure[ycen-dy:ycen+dy, xcen-dx:xcen+dx] <= 0.0,
                      True)
         if self._has_mask:
-            np.place(badpix, 
+            np.place(badpix,
                      self.mask[ycen-dy:ycen+dy, xcen-dx:xcen+dx] != 0,
                      True)
         nbad = np.count_nonzero(badpix)
@@ -452,7 +461,7 @@ class smap_map:
         Parameters
         ----------
         kernel: ndarray
-          Input smoothing filter in real space.  Should be much smaller 
+          Input smoothing filter in real space.  Should be much smaller
           than the input map, or this will be quite slow.  Note that
           you want this to be transposed to follow the fits convention.
 
@@ -462,7 +471,7 @@ class smap_map:
           actual map.  Uses brute-force (non-FFT) convolution, since
           this is usually faster for small kernels.
         """
-    
+
         from astropy.nddata import convolve
 
         badpix = self.where_bad()
@@ -487,7 +496,7 @@ class smap_map:
         if hasattr(self, 'names'):
             outstr += " desc: {:s}".format(self.names)
         tg = "\n RA: {0.:0.4f} [deg]  DEC: {1:0.4f} [deg]"
-        outstr += tg.format(self.astrometry.wcs.crval[0], 
+        outstr += tg.format(self.astrometry.wcs.crval[0],
                             self.astrometry.wcs.crval[1])
         outstr += " Pixscale: {:0.2f} [arcsec]".format(self.pixscale)
         outstr += "\n Map [{:d} x {:d}]".format(self.xsize, self.ysize)

@@ -9,6 +9,7 @@ from .defaults import smap_pixsize, spire_fwhm
 
 __all__ = ["get_gauss_beam", "get_spire_beam"]
 
+
 def get_spire_beam(band, pixscale=None, nfwhm=5.0, oversamp=5):
     """ Get default SPIRE beam
 
@@ -16,7 +17,7 @@ def get_spire_beam(band, pixscale=None, nfwhm=5.0, oversamp=5):
     ----------
     band: string
       Name of band ('PSW', 'PMW', 'PLW')
-    
+
     pixscale: float
       Pixel scale, in same units as FWHM.  If not provided, defaults
       based on band to the values in smap.smap_pixsize[band]
@@ -29,7 +30,7 @@ def get_spire_beam(band, pixscale=None, nfwhm=5.0, oversamp=5):
       beam.  The beam is generated in pixscale / oversamp size pixels,
       then rebinned to pixscale.
     """
-    
+
     if not band in spire_fwhm:
         raise ValueError("Unknown band for FWHM: {:s}".format(band))
     fwhm = spire_fwhm[band]
@@ -46,6 +47,7 @@ def get_spire_beam(band, pixscale=None, nfwhm=5.0, oversamp=5):
             raise ValueError(errmsg.format(pix))
 
     return get_gauss_beam(fwhm, pix, nfwhm=nfwhm, oversamp=oversamp)
+
 
 def get_gauss_beam(fwhm, pixscale, nfwhm=5.0, oversamp=5):
     """ Generate Gaussian kernel
@@ -65,7 +67,7 @@ def get_gauss_beam(fwhm, pixscale, nfwhm=5.0, oversamp=5):
       Odd integer giving the oversampling to use when constructing the
       beam.  The beam is generated in pixscale / oversamp size pixels,
       then rebinned to pixscale.
-    
+
     Notes
     -----
       The beam is normalized by having a value of 1 in the center.
@@ -92,15 +94,15 @@ def get_gauss_beam(fwhm, pixscale, nfwhm=5.0, oversamp=5):
 
     if oversamp == 1:
         # Easy case
-        beam = make_kernel((retext, retext), bmsigma / pixscale, 
+        beam = make_kernel((retext, retext), bmsigma / pixscale,
                            'gaussian').astype(np.float32)
         beam /= beam.max
     else:
         genext = retext * oversamp
         genpixscale = pixscale / oversamp
-        gbeam = make_kernel((genext, genext), bmsigma / genpixscale, 
-                           'gaussian').astype(np.float32)
-        gbeam /= gbeam.max() # Normalize -before- rebinning
+        gbeam = make_kernel((genext, genext), bmsigma / genpixscale,
+                            'gaussian').astype(np.float32)
+        gbeam /= gbeam.max()  # Normalize -before- rebinning
 
         # Rebinning -- tricky stuff!
         bmview = gbeam.reshape(retext, oversamp, retext, oversamp)

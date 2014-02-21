@@ -5,17 +5,22 @@ from __future__ import print_function
 from .smap_struct import smap_map
 from .smap_beam import get_gauss_beam
 import numpy as np
-from astropy.nddata import convolve
+
+try:
+    from astropy.convolution import convolve
+except ImportError:
+    from astropy.nddata import convolve
 
 __all__ = ["cattomap_gauss"]
 
-def cattomap_gauss(area, fluxes, wave=[250.0, 350, 500], 
-		   pixsize=[6.0, 8.33333, 12.0], racen=25.0, deccen=0.0, 
-		   fwhm=[17.6, 23.9, 35.2], nfwhm=5.0, bmoversamp=5, 
-		   sigma_inst=None, verbose=False):
+
+def cattomap_gauss(area, fluxes, wave=[250.0, 350, 500],
+                   pixsize=[6.0, 8.33333, 12.0], racen=25.0, deccen=0.0,
+                   fwhm=[17.6, 23.9, 35.2], nfwhm=5.0, bmoversamp=5,
+                   sigma_inst=None, verbose=False):
     """ Generates simulated maps as SMAP structures using a Gaussian beam
     from an input catalog of flux densities.
-    
+
     Parameters
     ----------
     area: float
@@ -35,7 +40,7 @@ def cattomap_gauss(area, fluxes, wave=[250.0, 350, 500],
 
     racen: float
       Right ascension of generated maps
-          
+
     deccen: float
       Declination of generated maps
 
@@ -59,13 +64,13 @@ def cattomap_gauss(area, fluxes, wave=[250.0, 350, 500],
       indexed in [y, x] order.
     """
 
-    import math	
+    import math
     from numbers import Number
 
     # Check inputs
     if not isinstance(fluxes, np.ndarray):
         raise TypeError("Input fluxes not ndarray")
-    
+
     # Get number of bands
     if len(fluxes.shape) == 1:
         # 1 band case
@@ -75,7 +80,7 @@ def cattomap_gauss(area, fluxes, wave=[250.0, 350, 500],
         nbands = fluxes.shape[1]
     else:
         raise ValueError("Input fluxes of unexpected dimension")
-    
+
     if len(wave) < nbands:
         raise ValueError("Number of wavelengths not the same as the"
                          " number of bands")
@@ -118,17 +123,17 @@ def cattomap_gauss(area, fluxes, wave=[250.0, 350, 500],
         if has_sigma:
             s_map.create(np.zeros((nextent[i], nextent[i]), dtype=np.float32),
                          pixsize[i], racen, deccen, wave=wave[i],
-                         error=int_sigma[i]*np.ones((nextent[i], nextent[i]), 
+                         error=int_sigma[i]*np.ones((nextent[i], nextent[i]),
                                                     dtype=np.float32))
         else:
             s_map.create(np.zeros((nextent[i], nextent[i]), dtype=np.float32),
                          pixsize[i], racen, deccen, wave=wave[i])
         maps.append(s_map)
- 
+
     # Generate positions in the first band for all sources
     xpos = nextent[0] * np.random.rand(nsrcs)
     ypos = nextent[0] * np.random.rand(nsrcs)
-    
+
     # Construct maps
     for i in range(nbands):
         if verbose:
@@ -144,8 +149,8 @@ def cattomap_gauss(area, fluxes, wave=[250.0, 350, 500],
         nx, ny = cmap.shape
         np.place(xf, xf > nx-1, nx-1)
         np.place(yf, yf > ny-1, ny-1)
-        for cx, cy, cf in zip(xf, yf, fluxes[:,i]):
-            cmap[cy, cx] += cf # Note y, x
+        for cx, cy, cf in zip(xf, yf, fluxes[:, i]):
+            cmap[cy, cx] += cf  # Note y, x
 
         # Smooth
         if verbose:
@@ -154,12 +159,12 @@ def cattomap_gauss(area, fluxes, wave=[250.0, 350, 500],
         maps[i].image = convolve(cmap, bm, boundary='wrap')
 
         # Noise
-        if verbose:
-            print(" Adding noise")
         if has_sigma:
-            maps[i].image +=np.random.normal(scale=int_sigma[i], 
-                                             size=maps[i].image.shape)
-            
+            if verbose:
+                print(" Adding noise")
+            maps[i].image += np.random.normal(scale=int_sigma[i],
+                                              size=maps[i].image.shape)
+
         maps[i].image -= maps[i].image.mean()
-        
+
     return (maps, xpos, ypos)

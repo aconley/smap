@@ -13,8 +13,9 @@ import scipy.fftpack as fft
 
 from astropy.nddata.convolution.make_kernel import make_kernel
 
-__all__ = ["make_matched_filter", "make_red_matched_filter", 
+__all__ = ["make_matched_filter", "make_red_matched_filter",
            "matched_filter", "matched_filter_red"]
+
 
 def make_beam(band, pixscale, nx, ny):
     """ Internal helper function to make full size, 0,0 centered beam.
@@ -27,6 +28,7 @@ def make_beam(band, pixscale, nx, ny):
     beam /= beam.max()
     # The max is as nx // 2, ny // 2 -- we want it at 0, 0
     return np.roll(np.roll(beam, -(ny // 2), axis=0), -(nx // 2), axis=1)
+
 
 def filt_norm_fac(filt, band, pixscale):
     """ Return the normalization factor for the filter"""
@@ -49,7 +51,8 @@ def filt_norm_fac(filt, band, pixscale):
     # Return the factor to multiply the filter by
     return 1.0 / test_im.max()
 
-def make_matched_filter(band, nx, ny, inst_noise, conf_noise=None, 
+
+def make_matched_filter(band, nx, ny, inst_noise, conf_noise=None,
                         pixscale=None):
     """ Builds the real space matched filters for a single SPIRE band.
 
@@ -86,7 +89,7 @@ def make_matched_filter(band, nx, ny, inst_noise, conf_noise=None,
       The real space matched filter.  Note that
       they are not applied to the data by this function.
     """
-    
+
     if not band in spire_fwhm:
         raise ValueError("Unknown band: {:s}".format(band))
     nx = int(nx)
@@ -97,7 +100,8 @@ def make_matched_filter(band, nx, ny, inst_noise, conf_noise=None,
         raise ValueError("Invalid (non-positive) ny: {:d}".format(ny))
     inst_noise = float(inst_noise)
     if inst_noise < 0:
-        raise ValueError("Invalid (negative) instrument noise {:f}".format(inst_noise))
+        errstr = "Invalid (negative) instrument noise {:f}"
+        raise ValueError(errstr.format(inst_noise))
     if conf_noise is None:
         conf_noise = spire_confusion[band]
     else:
@@ -110,7 +114,7 @@ def make_matched_filter(band, nx, ny, inst_noise, conf_noise=None,
     else:
         pixscale = float(pixscale)
         if pixscale <= 0.0:
-            errmsg = "Invalid (non-positive) pixel scale: {:f}" 
+            errmsg = "Invalid (non-positive) pixel scale: {:f}"
             raise ValueError(errmsg.format(pixscale))
 
     if inst_noise == 0 and conf_noise == 0:
@@ -123,7 +127,6 @@ def make_matched_filter(band, nx, ny, inst_noise, conf_noise=None,
     else:
         p_noise = np.zeros((ny, nx), dtype=np.float32)
 
-
     # We build this ourselves to get the right size and
     # centered in the right place
     beam = make_beam(band, pixscale, nx, ny)
@@ -135,14 +138,14 @@ def make_matched_filter(band, nx, ny, inst_noise, conf_noise=None,
         p_noise += scale_confusion * np.abs(beam_fft)**2
 
     # Get real space filter, unshifting and taking only
-    # the center. 
+    # the center.
     filt = np.real(fft.ifft2(beam500_fft / p_noise))
     npix_take = math.ceil(6 * spire_fwhm[band] / pixscale)
     if npix_take % 2 == 0:
         npix_take += 1
     if npix_take > nx or npix_take > ny:
         raise ValueError("Map was too small to adequately apply filter")
-    filt = np.roll(np.roll(filt, npix_take // 2, axis=0), 
+    filt = np.roll(np.roll(filt, npix_take // 2, axis=0),
                    npix_take // 2, axis=1)
     filt = filt[0:npix_take, 0:npix_take]
 
@@ -150,7 +153,7 @@ def make_matched_filter(band, nx, ny, inst_noise, conf_noise=None,
     filt *= filt_norm_fac(filt, band, pixscale)
 
     return filt
-    
+
 
 def make_red_matched_filter(nx, ny, pixscale, inst_noise, conf_noise,
                             verbose=False):
@@ -158,7 +161,7 @@ def make_red_matched_filter(nx, ny, pixscale, inst_noise, conf_noise,
 
     This builds the Ed Chapin style matched filter for
     the 500 micron band, and then finds the filters to match the
-    other two bands to that beam.  
+    other two bands to that beam.
 
     Parameters
     ----------
@@ -234,7 +237,7 @@ def make_red_matched_filter(nx, ny, pixscale, inst_noise, conf_noise,
         npix_take += 1
     if npix_take > nx or npix_take > ny:
         raise ValueError("Map was too small to adequately apply filter")
-    filt500 = np.roll(np.roll(filt500, npix_take // 2, axis=0), 
+    filt500 = np.roll(np.roll(filt500, npix_take // 2, axis=0),
                       npix_take // 2, axis=1)
     filt500 = filt500[0:npix_take, 0:npix_take]
 
@@ -245,7 +248,7 @@ def make_red_matched_filter(nx, ny, pixscale, inst_noise, conf_noise,
     filt_fft = fft.fft2(beam250)
     filt_fft = beam500_fft**2 / (filt_fft * p_noise)
     filt250 = np.real(fft.ifft2(filt_fft))
-    filt250 = np.roll(np.roll(filt250, npix_take // 2, axis=0), 
+    filt250 = np.roll(np.roll(filt250, npix_take // 2, axis=0),
                       npix_take // 2, axis=1)
     filt250 = filt250[0:npix_take, 0:npix_take]
 
@@ -256,7 +259,7 @@ def make_red_matched_filter(nx, ny, pixscale, inst_noise, conf_noise,
     filt_fft = fft.fft2(beam350)
     filt_fft = beam500_fft**2 / (filt_fft * p_noise)
     filt350 = np.real(fft.ifft2(filt_fft))
-    filt350 = np.roll(np.roll(filt350, npix_take // 2, axis=0), 
+    filt350 = np.roll(np.roll(filt350, npix_take // 2, axis=0),
                       npix_take // 2, axis=1)
     filt350 = filt350[0:npix_take, 0:npix_take]
 
@@ -268,8 +271,8 @@ def make_red_matched_filter(nx, ny, pixscale, inst_noise, conf_noise,
     filt500 *= filt_norm_fac(filt500, 'PLW', pixscale)
 
     return (filt250, filt350, filt500)
-    
-    
+
+
 def matched_filter(inmap, conf_noise=None, verbose=False):
     """ Apply matched filtering to the input SPIRE map
 
@@ -295,7 +298,7 @@ def matched_filter(inmap, conf_noise=None, verbose=False):
     -----
       Currently does not adjust the error maps.
     """
-    
+
     # Make sure the input map is acceptable
     if not inmap.has_data:
         raise Exception("Input map has no data")
@@ -309,7 +312,8 @@ def matched_filter(inmap, conf_noise=None, verbose=False):
     if not hasattr(inmap, 'names'):
         raise Exception("Don't know band of SPIRE map")
     if not inmap.names in spire_fwhm:
-        raise Exception("Unknown band from input map: {:s}".format(inmap.names))
+        errstr = "Unknown band from input map: {:s}"
+        raise Exception(errstr.format(inmap.names))
 
     if conf_noise is None:
         conf_noise = spire_confusion[inmap.names]
@@ -359,7 +363,7 @@ def matched_filter_red(map250, map350, map500, conf_noise, k1=-0.3919, k2=0.0,
       noise levels in the combined map.
 
     k2: float
-      Scale for 350um map.  -1 + k1^2 <= k2 <= 1 - k1^2; used to compute 
+      Scale for 350um map.  -1 + k1^2 <= k2 <= 1 - k1^2; used to compute
       instrument noise levels in the combined map.
 
     verbose: bool
@@ -387,7 +391,7 @@ def matched_filter_red(map250, map350, map500, conf_noise, k1=-0.3919, k2=0.0,
       always treat the first map as PSW, etc., even if it isn't.  So entering
       them in the wrong order will quietly do the wrong thing.
     """
-    
+
     # Check k coefficients
     k1 = float(k1)
     k2 = float(k2)
@@ -399,7 +403,7 @@ def matched_filter_red(map250, map350, map500, conf_noise, k1=-0.3919, k2=0.0,
     if conf_noise < 0.0:
         errmsg = "Invalid (negative) confusion noise: {:f}"
         raise ValueError(errmsg.format(conf_noise))
-    
+
     # Make sure the maps have data
     if not map250.has_data:
         raise Exception("250um map has no data")
