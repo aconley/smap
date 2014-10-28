@@ -5,6 +5,6 @@ from .defaults import *
 from .matched_filter import *
 from .generate_map import *
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
-__doc__ = """ SMAP data handling routines"""
+__doc__ = """ HerMES SMAP data handling routines"""

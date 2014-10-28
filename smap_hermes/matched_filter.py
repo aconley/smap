@@ -11,7 +11,7 @@ import math
 import numpy as np
 import scipy.fftpack as fft
 
-from astropy.nddata.convolution.make_kernel import make_kernel
+from astropy.convolution import Gaussian2DKernel
 
 __all__ = ["make_matched_filter", "make_red_matched_filter",
            "matched_filter", "matched_filter_red"]
@@ -24,7 +24,7 @@ def make_beam(band, pixscale, nx, ny):
 
     fwhm_pix = spire_fwhm[band] / pixscale
     sigma_pix = fwhm_pix / math.sqrt(8 * math.log(2))
-    beam = make_kernel((ny, nx), kernelwidth=sigma_pix)
+    beam = Gaussian2DKernel(sigma_pix, x_size=ny, y_size=nx)
     beam /= beam.max()
     # The max is as nx // 2, ny // 2 -- we want it at 0, 0
     return np.roll(np.roll(beam, -(ny // 2), axis=0), -(nx // 2), axis=1)
@@ -33,15 +33,18 @@ def make_beam(band, pixscale, nx, ny):
 def filt_norm_fac(filt, band, pixscale):
     """ Return the normalization factor for the filter"""
 
-    from astropy.nddata import convolve
+    from astropy.convolution import convolve
 
     # Do this empirically -- make a small image, smooth with this,
     # check the normalization.  This uses per-beam normalization.
     # The test image is just the un-smoothed beam for this band
     # with a maximum of 1.0
     sigma_pix = spire_fwhm[band] / (pixscale * math.sqrt(8 * math.log(2)))
-    test_im = make_kernel((4 * filt.shape[0], 4 * filt.shape[1]),
-                          kernelwidth=sigma_pix, force_odd=True)
+    xsz = 4 * filt.shape[0]
+    if xsz % 2 == 0: xsz += 1
+    ysz = 4 * filt.shape[1]
+    if ysz % 2 == 0: ysz += 1
+    test_im = Gaussian2DKernel(sigma_pix, x_size=xsz, y_size=ysz)
     test_im /= test_im.max()
 
     # Convolve

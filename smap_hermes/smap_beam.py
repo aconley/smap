@@ -3,7 +3,7 @@
 
 import math
 import numpy as np
-from astropy.nddata.convolution.make_kernel import make_kernel
+from astropy.convolution import Gaussian2DKernel
 
 from .defaults import smap_pixsize, spire_fwhm
 
@@ -94,14 +94,14 @@ def get_gauss_beam(fwhm, pixscale, nfwhm=5.0, oversamp=5):
 
     if oversamp == 1:
         # Easy case
-        beam = make_kernel((retext, retext), bmsigma / pixscale,
-                           'gaussian').astype(np.float32)
-        beam /= beam.max
+        beam = Gaussian2DKernel(bmsigma / pixscale, x_size=retext,
+                                y_size=retext).array.astype('float32')
+        beam /= beam.max()
     else:
         genext = retext * oversamp
         genpixscale = pixscale / oversamp
-        gbeam = make_kernel((genext, genext), bmsigma / genpixscale,
-                            'gaussian').astype(np.float32)
+        gbeam = Gaussian2DKernel(bmsigma / genpixscale, x_size=genext,
+                                y_size=genext).array.astype('float32')
         gbeam /= gbeam.max()  # Normalize -before- rebinning
 
         # Rebinning -- tricky stuff!
